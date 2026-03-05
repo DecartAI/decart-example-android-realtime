@@ -22,7 +22,7 @@ Native Android app demonstrating Decart's Realtime Video models. Transform your 
 1. Clone both repos side by side:
 
 ```bash
-git clone https://github.com/DecartAI/decart-android-sdk.git
+git clone https://github.com/DecartAI/decart-android.git
 git clone https://github.com/DecartAI/decart-example-android-realtime.git
 ```
 
@@ -30,7 +30,7 @@ Your directory should look like:
 
 ```
 parent/
-  decart-android-sdk/
+  decart-android/
   decart-example-android-realtime/
 ```
 
@@ -73,7 +73,7 @@ Camera -> WebRTC -> Decart Servers -> AI Model -> Transformed Frames -> Display
 
 ## Resources
 
-- [Decart Android SDK](https://github.com/DecartAI/decart-android-sdk)
+- [Decart Android SDK](https://github.com/DecartAI/decart-android)
 - [Decart Platform](https://decart.ai)
 - [API Documentation](https://docs.decart.ai)
 - [Get an API Key](https://decart.ai)

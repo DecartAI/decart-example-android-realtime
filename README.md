@@ -19,19 +19,10 @@ Native Android app demonstrating Decart's Realtime Video models. Transform your 
 
 ## Setup
 
-1. Clone both repos side by side:
+1. Clone the repo:
 
 ```bash
-git clone https://github.com/DecartAI/decart-android.git
 git clone https://github.com/DecartAI/decart-example-android-realtime.git
-```
-
-Your directory should look like:
-
-```
-parent/
-  decart-android/
-  decart-example-android-realtime/
 ```
 
 2. Add your API key in `app/src/main/java/ai/decart/example/MainViewModel.kt`:
@@ -40,7 +31,7 @@ parent/
 private val API_KEY = "your-api-key-here"
 ```
 
-3. Open `decart-example-android-realtime` in Android Studio.
+3. Open the project in Android Studio.
 
 4. Connect a physical device and run the app.
 

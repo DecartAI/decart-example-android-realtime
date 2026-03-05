@@ -41,7 +41,7 @@ android {
 }
 
 dependencies {
-    implementation("ai.decart:sdk")
+    implementation("com.github.DecartAI.decart-android:sdk:0.1.0")
     implementation(libs.google.webrtc)
     implementation(libs.core.ktx)
 

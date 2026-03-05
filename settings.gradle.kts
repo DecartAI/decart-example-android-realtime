@@ -11,14 +11,9 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri("https://jitpack.io") }
     }
 }
 
 rootProject.name = "decart-example-android"
 include(":app")
-
-includeBuild("../decart-android") {
-    dependencySubstitution {
-        substitute(module("ai.decart:sdk")).using(project(":sdk"))
-    }
-}

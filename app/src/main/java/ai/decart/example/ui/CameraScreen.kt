@@ -20,6 +20,8 @@ fun CameraScreen(viewModel: MainViewModel) {
     val currentSkinIndex by viewModel.currentSkinIndex.collectAsStateWithLifecycle()
     val viewMode by viewModel.viewMode.collectAsStateWithLifecycle()
     val showOnboarding by viewModel.showOnboarding.collectAsStateWithLifecycle()
+    val localStream by viewModel.localStream.collectAsStateWithLifecycle()
+    val remoteStream by viewModel.remoteStream.collectAsStateWithLifecycle()
 
     val isConnected = connectionState == ConnectionState.CONNECTED ||
             connectionState == ConnectionState.GENERATING
@@ -46,7 +48,8 @@ fun CameraScreen(viewModel: MainViewModel) {
     ) {
         // Video layer
         VideoRenderer(
-            viewModel = viewModel,
+            localStream = localStream,
+            remoteStream = remoteStream,
             viewMode = viewMode,
             modifier = Modifier.fillMaxSize()
         )

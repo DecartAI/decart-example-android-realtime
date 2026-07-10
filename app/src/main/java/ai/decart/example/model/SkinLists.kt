@@ -4,7 +4,7 @@ import ai.decart.example.R
 
 object SkinLists {
 
-    val mirageSkins = listOf(
+    val lucyRestyleSkins = listOf(
         Skin(
             title = "Snowland",
             prompt = "Disney's \"Frozen\" style 3D animated film featuring vibrant, smooth visuals and a whimsical, magical atmosphere. The color palette is bright and icy, with cool blues, whites, and hints of purple and pink. Surfaces are polished with a snow-like texture, and materials have a stylized, glossy finish. Lighting is soft and even, with a focus on creating a bright, enchanting winter wonderland ambiance.",

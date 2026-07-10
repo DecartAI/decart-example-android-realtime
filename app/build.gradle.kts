@@ -41,8 +41,9 @@ android {
 }
 
 dependencies {
-    implementation("com.github.DecartAI:decart-android:0.1.0")
+    implementation("com.github.DecartAI:decart-android:0.7.7")
     implementation(libs.google.webrtc)
+    implementation(libs.livekit.android.compose.components)
     implementation(libs.core.ktx)
 
     implementation(platform(libs.compose.bom))

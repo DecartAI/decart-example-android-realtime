@@ -10,7 +10,6 @@ import ai.decart.example.model.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import org.webrtc.*
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -23,27 +22,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val context: Context get() = getApplication()
 
-    // WebRTC - initialized once, shared EGL context for camera + SDK + renderers
-    var eglBase: EglBase? = null
-        private set
-    private var peerConnectionFactory: PeerConnectionFactory? = null
-
     // SDK client - created once, reused across connect/disconnect cycles
     private var client: RealTimeClient? = null
     private var stateCollectorJob: Job? = null
-
-    private var videoCapturer: CameraVideoCapturer? = null
-    private var videoSource: VideoSource? = null
-    private var localVideoTrack: VideoTrack? = null
-    private var surfaceTextureHelper: SurfaceTextureHelper? = null
+    private var localStreamCollectorJob: Job? = null
+    private var remoteStreamCollectorJob: Job? = null
     private var isFrontFacingCamera = true
 
-    // Renderers set by UI
-    var localRenderer: SurfaceViewRenderer? = null
-    var remoteRenderer: SurfaceViewRenderer? = null
-
-    // Remote video track ref
-    private var remoteVideoTrack: VideoTrack? = null
     private var hasEverConnected = false
 
     // State
@@ -62,9 +47,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _showOnboarding = MutableStateFlow(false)
     val showOnboarding: StateFlow<Boolean> = _showOnboarding.asStateFlow()
 
+    private val _localStream = MutableStateFlow<RealtimeMediaStream?>(null)
+    val localStream: StateFlow<RealtimeMediaStream?> = _localStream.asStateFlow()
+
+    private val _remoteStream = MutableStateFlow<RealtimeMediaStream?>(null)
+    val remoteStream: StateFlow<RealtimeMediaStream?> = _remoteStream.asStateFlow()
+
     val currentSkins: List<Skin>
         get() = when (_currentModel.value) {
-            AppModel.RESTYLE -> SkinLists.mirageSkins
+            AppModel.RESTYLE -> SkinLists.lucyRestyleSkins
             AppModel.EDIT -> SkinLists.lucySkins
         }
 
@@ -78,26 +69,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     init {
-        eglBase = EglBase.create()
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         if (!prefs.getBoolean(KEY_ONBOARDING_SHOWN, false)) {
             _showOnboarding.value = true
         }
     }
 
-    private fun ensureInitialized() {
-        if (peerConnectionFactory == null) {
-            val eglContext = eglBase!!.eglBaseContext
-            PeerConnectionFactory.initialize(
-                PeerConnectionFactory.InitializationOptions.builder(context)
-                    .setEnableInternalTracer(false)
-                    .createInitializationOptions()
-            )
-            peerConnectionFactory = PeerConnectionFactory.builder()
-                .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglContext, true, true))
-                .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglContext))
-                .createPeerConnectionFactory()
-        }
+    private fun ensureClient() {
         if (client == null) {
             val rtClient = RealTimeClient(
                 context = context,
@@ -107,12 +85,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     logger = AndroidLogger(LogLevel.WARN)
                 )
             )
-            rtClient.initialize(eglBase)
             client = rtClient
 
             stateCollectorJob = viewModelScope.launch {
                 rtClient.connectionState.collect { state ->
                     _connectionState.value = state
+                }
+            }
+            localStreamCollectorJob = viewModelScope.launch {
+                rtClient.localStreamUpdates.collect { stream ->
+                    _localStream.value = stream
+                }
+            }
+            remoteStreamCollectorJob = viewModelScope.launch {
+                rtClient.remoteStreamUpdates.collect { stream ->
+                    _remoteStream.value = stream
                 }
             }
         }
@@ -130,38 +117,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _connectionState.value = ConnectionState.CONNECTING
                 hasEverConnected = true
 
-                ensureInitialized()
-                startCamera()
+                ensureClient()
 
                 val skin = currentSkin
-                val renderer = remoteRenderer
 
                 client!!.connect(
-                    localVideoTrack = localVideoTrack,
                     options = ConnectOptions(
                         model = _currentModel.value.realtimeModel,
-                        onRemoteVideoTrack = { track ->
-                            remoteVideoTrack = track
-                            renderer?.let { track.addSink(it) }
-                        },
+                        facing = currentFacingMode(),
+                        publishCamera = true,
+                        onRemoteStream = { stream -> _remoteStream.value = stream },
                         initialPrompt = InitialPrompt(text = skin.prompt, enhance = false)
                     )
                 )
             } catch (e: Exception) {
                 _connectionState.value = ConnectionState.DISCONNECTED
                 try { client?.disconnect() } catch (_: Exception) {}
-                stopCamera()
+                _localStream.value = null
+                _remoteStream.value = null
             }
         }
     }
 
     fun disconnect() {
-        remoteVideoTrack?.let { track ->
-            remoteRenderer?.let { track.removeSink(it) }
-        }
-        remoteVideoTrack = null
         client?.disconnect()
-        stopCamera()
+        _localStream.value = null
+        _remoteStream.value = null
         _connectionState.value = ConnectionState.DISCONNECTED
     }
 
@@ -180,7 +161,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (index < 0 || index >= skins.size) return
         _currentSkinIndex.value = index
         if (isConnected) {
-            client?.setPrompt(skins[index].prompt, false)
+            viewModelScope.launch {
+                client?.setPrompt(skins[index].prompt, false)
+            }
         }
     }
 
@@ -195,9 +178,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun switchCamera() {
-        val capturer = videoCapturer ?: return
         isFrontFacingCamera = !isFrontFacingCamera
-        capturer.switchCamera(null)
+        if (isConnected || _connectionState.value == ConnectionState.CONNECTING) {
+            disconnect()
+            connect()
+        }
     }
 
     fun cycleViewMode() {
@@ -220,53 +205,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun startCamera() {
-        val egl = eglBase ?: return
-        val factory = peerConnectionFactory ?: return
-
-        val enumerator = Camera2Enumerator(context)
-        val deviceName = if (isFrontFacingCamera) {
-            enumerator.deviceNames.firstOrNull { enumerator.isFrontFacing(it) }
-        } else {
-            enumerator.deviceNames.firstOrNull { !enumerator.isFrontFacing(it) }
-        } ?: enumerator.deviceNames.firstOrNull() ?: return
-
-        val capturer = enumerator.createCapturer(deviceName, null)
-        videoCapturer = capturer
-
-        videoSource = factory.createVideoSource(capturer.isScreencast)
-        localVideoTrack = factory.createVideoTrack("local_video", videoSource)
-        localVideoTrack?.setEnabled(true)
-
-        surfaceTextureHelper = SurfaceTextureHelper.create("CaptureThread", egl.eglBaseContext)
-        capturer.initialize(surfaceTextureHelper, context, videoSource!!.capturerObserver)
-        capturer.startCapture(1280, 720, 30)
-
-        localRenderer?.let { localVideoTrack?.addSink(it) }
-    }
-
-    private fun stopCamera() {
-        localRenderer?.let { localVideoTrack?.removeSink(it) }
-        localVideoTrack?.dispose()
-        localVideoTrack = null
-        try { videoCapturer?.stopCapture() } catch (_: Exception) {}
-        videoCapturer?.dispose()
-        videoCapturer = null
-        videoSource?.dispose()
-        videoSource = null
-        surfaceTextureHelper?.dispose()
-        surfaceTextureHelper = null
+    private fun currentFacingMode(): FacingMode {
+        return if (isFrontFacingCamera) FacingMode.FRONT else FacingMode.BACK
     }
 
     override fun onCleared() {
         super.onCleared()
         disconnect()
         stateCollectorJob?.cancel()
+        localStreamCollectorJob?.cancel()
+        remoteStreamCollectorJob?.cancel()
         client?.release()
         client = null
-        peerConnectionFactory?.dispose()
-        peerConnectionFactory = null
-        // eglBase is released by client.release() since we passed it to initialize()
-        eglBase = null
     }
 }

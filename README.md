@@ -4,7 +4,7 @@ Native Android app demonstrating Decart's Realtime Video models. Transform your 
 
 ## Features
 
-- **Video Restyling (Mirage V2)** -- Transform your camera feed into different visual styles
+- **Video Restyling (Lucy Restyle)** -- Transform your camera feed into different visual styles
 - **Video Editing (Lucy 2 RT)** -- Real-time AI video editing
 - **Multiple View Modes** -- Fullscreen, picture-in-picture, and vertical split
 - **Front/Back Camera** -- Switch between cameras on the fly
@@ -54,13 +54,6 @@ The app captures your camera feed and streams it via WebRTC to Decart's servers,
 ```
 Camera -> WebRTC -> Decart Servers -> AI Model -> Transformed Frames -> Display
 ```
-
-## Models
-
-| Mode | Model | Description |
-|------|-------|-------------|
-| Restyle | Mirage V2 | Transform visual style (anime, cyberpunk, etc.) |
-| Edit | Lucy 2 RT | Real-time video editing |
 
 ## Resources
 

@@ -2,6 +2,7 @@
 kotlin = "2.1.0"
 agp = "8.7.3"
 webrtc = "125.6422.04"
+livekitComposeComponents = "2.3.0"
 compose-bom = "2024.12.01"
 activity-compose = "1.9.3"
 lifecycle = "2.8.7"
@@ -9,6 +10,7 @@ core-ktx = "1.15.0"
 
 [libraries]
 google-webrtc = { group = "io.github.webrtc-sdk", name = "android", version.ref = "webrtc" }
+livekit-android-compose-components = { group = "io.livekit", name = "livekit-android-compose-components", version.ref = "livekitComposeComponents" }
 core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "core-ktx" }
 
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }

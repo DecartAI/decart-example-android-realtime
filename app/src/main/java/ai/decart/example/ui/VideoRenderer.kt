@@ -4,36 +4,34 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import ai.decart.example.MainViewModel
 import ai.decart.example.model.ViewMode
-import org.webrtc.SurfaceViewRenderer
+import ai.decart.sdk.realtime.RealtimeMediaStream
+import io.livekit.android.compose.ui.VideoTrackView
 
 @Composable
 fun VideoRenderer(
-    viewModel: MainViewModel,
+    localStream: RealtimeMediaStream?,
+    remoteStream: RealtimeMediaStream?,
     viewMode: ViewMode,
     modifier: Modifier = Modifier
 ) {
-    val eglContext = remember { viewModel.eglBase?.eglBaseContext }
-
     when (viewMode) {
         ViewMode.TRANSFORMED -> {
             // Remote only, full screen
             Box(modifier = modifier) {
-                RemoteView(viewModel, eglContext, Modifier.fillMaxSize())
+                StreamView(remoteStream, Modifier.fillMaxSize())
             }
         }
 
         ViewMode.PIP -> {
             Box(modifier = modifier) {
-                RemoteView(viewModel, eglContext, Modifier.fillMaxSize())
+                StreamView(remoteStream, Modifier.fillMaxSize())
                 // Local PIP in bottom-left corner
                 Box(
                     modifier = Modifier
@@ -44,7 +42,7 @@ fun VideoRenderer(
                         .clip(RoundedCornerShape(12.dp))
                         .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                 ) {
-                    LocalView(viewModel, eglContext, Modifier.fillMaxSize())
+                    StreamView(localStream, Modifier.fillMaxSize(), mirror = true)
                 }
             }
         }
@@ -57,7 +55,7 @@ fun VideoRenderer(
                         .fillMaxWidth()
                         .background(Color.Black)
                 ) {
-                    LocalView(viewModel, eglContext, Modifier.fillMaxSize())
+                    StreamView(localStream, Modifier.fillMaxSize(), mirror = true)
                 }
                 Box(
                     modifier = Modifier
@@ -65,7 +63,7 @@ fun VideoRenderer(
                         .fillMaxWidth()
                         .background(Color.Black)
                 ) {
-                    RemoteView(viewModel, eglContext, Modifier.fillMaxSize())
+                    StreamView(remoteStream, Modifier.fillMaxSize())
                 }
             }
         }
@@ -73,50 +71,25 @@ fun VideoRenderer(
 }
 
 @Composable
-private fun RemoteView(
-    viewModel: MainViewModel,
-    eglContext: org.webrtc.EglBase.Context?,
-    modifier: Modifier
+private fun StreamView(
+    stream: RealtimeMediaStream?,
+    modifier: Modifier,
+    mirror: Boolean = false
 ) {
-    if (eglContext == null) return
-    AndroidView(
-        factory = { ctx ->
-            SurfaceViewRenderer(ctx).also { renderer ->
-                renderer.init(eglContext, null)
-                renderer.setEnableHardwareScaler(true)
-                renderer.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
-                viewModel.remoteRenderer = renderer
-            }
-        },
-        modifier = modifier,
-        onRelease = { renderer ->
-            viewModel.remoteRenderer = null
-            renderer.release()
-        }
-    )
-}
+    val videoTrack = stream?.videoTrack
+    val room = stream?.room
 
-@Composable
-private fun LocalView(
-    viewModel: MainViewModel,
-    eglContext: org.webrtc.EglBase.Context?,
-    modifier: Modifier
-) {
-    if (eglContext == null) return
-    AndroidView(
-        factory = { ctx ->
-            SurfaceViewRenderer(ctx).also { renderer ->
-                renderer.init(eglContext, null)
-                renderer.setMirror(true)
-                renderer.setEnableHardwareScaler(true)
-                renderer.setScalingType(org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL)
-                viewModel.localRenderer = renderer
-            }
-        },
+    Box(
         modifier = modifier,
-        onRelease = { renderer ->
-            viewModel.localRenderer = null
-            renderer.release()
+        contentAlignment = Alignment.Center
+    ) {
+        if (videoTrack != null && room != null) {
+            VideoTrackView(
+                videoTrack = videoTrack,
+                passedRoom = room,
+                modifier = Modifier.fillMaxSize(),
+                mirror = mirror
+            )
         }
-    )
+    }
 }
